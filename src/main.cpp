@@ -4,6 +4,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <stdint.h>
 
 static const int kCaptureWidth = 1536;
 static const int kCaptureHeight = 1024;
@@ -14,25 +15,9 @@ static const char kCurveData[8] = {250, 0, 240, 0, 250, 0, 240, 0};
  * quick processing you need, or have it put the frame into your application's
  * input queue. If this function takes too long, you'll start losing frames. */
 void cb(uvc_frame_t *frame, void *stopPtr) {
-  uvc_error_t ret;
-  uvc_frame_t *mono = uvc_allocate_frame(frame->width * frame->height);
-  if (!mono) {
-    printf("unable to allocate mono frame!");
-    return;
-  }
-
-  ret = uvc_yuyv2y(frame, mono);
-  if (ret) {
-    uvc_perror(ret, "uvc_any2mono");
-    uvc_free_frame(mono);
-    return;
-  }
-
-  cv::Mat cvFrame(mono->height, mono->width, CV_8UC1, mono->data);
-  // cvFrame.convertTo(cvFrame, -1, 100, 0);
+  cv::Mat cvFrame(frame->height, frame->width, CV_16UC1, frame->data);
+  cvFrame.convertTo(cvFrame, CV_16U, 100, 0);
   imshow("main", cvFrame);
-
-  uvc_free_frame(mono);
 }
 
 void setLights(uvc_device_handle_t *devh, int lights) {
@@ -109,13 +94,16 @@ int main(int argc, char **argv) {
             if((char)key == 'p') {
               setupParams(devh);
             }
+            if((char)key == 'g') {
+              uvc_set_gain(devh, 25);
+            }
           }
           setLights(devh, 0);
+          sleep(1);
           /* End the stream. Blocks until last callback is serviced */
           uvc_stop_streaming(devh);
           puts("Done streaming.");
         }
-        sleep(1);
       }
       /* Release our handle on the device */
       uvc_close(devh);
