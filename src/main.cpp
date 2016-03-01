@@ -2,13 +2,15 @@
 // Copyright (C) 2016  Tristan Hume
 // Released under GPLv2, see LICENSE file for full text
 
-#include "libuvc/libuvc.h"
+#include <libuvc/libuvc.h>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
+
+#include "eyetracking.h"
 
 static const int kCaptureWidth = 1536;
 static const int kCaptureHeight = 1024;
@@ -20,8 +22,7 @@ static const char kCurveData[8] = {250, 0, 240, 0, 250, 0, 240, 0};
  * input queue. If this function takes too long, you'll start losing frames. */
 void cb(uvc_frame_t *frame, void *stopPtr) {
   cv::Mat cvFrame(frame->height, frame->width, CV_16UC1, frame->data);
-  cvFrame.convertTo(cvFrame, CV_16U, 100, 0);
-  imshow("main", cvFrame);
+  trackFrame(cvFrame);
 }
 
 void setLights(uvc_device_handle_t *devh, int lights) {
@@ -46,7 +47,7 @@ int main(int argc, char **argv) {
     uvc_perror(res, "uvc_init");
     return res;
   }
-  cv::namedWindow("main",CV_WINDOW_NORMAL);
+  setupTracking();
   puts("UVC initialized");
   /* Locates the first attached UVC device, stores in dev */
   res = uvc_find_device(
@@ -77,6 +78,7 @@ int main(int argc, char **argv) {
         uvc_perror(res, "get_mode"); /* device doesn't provide a matching stream */
       } else {
         setLights(devh, 0b1111);
+        setupParams(devh);
         int stop = 0;
         /* Start the video stream. The library will call user function cb:
          *   cb(frame, (void*) 0)
@@ -95,12 +97,10 @@ int main(int argc, char **argv) {
             if((char)key == 'o') {
               setLights(devh, 0);
             }
-            if((char)key == 'p') {
-              setupParams(devh);
-            }
             if((char)key == 'g') {
-              uvc_set_gain(devh, 25);
+              uvc_set_gain(devh, 10);
             }
+            // usleep(10000);
           }
           setLights(devh, 0);
           sleep(1);
