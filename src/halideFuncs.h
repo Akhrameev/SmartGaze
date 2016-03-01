@@ -9,3 +9,4 @@ HalideGens *createGens();
 void deleteGens(HalideGens *gens);
 
 cv::Mat glintKernel(HalideGens *gens, cv::Mat &m);
+cv::Mat findGlints(HalideGens *gens, cv::Mat &m);

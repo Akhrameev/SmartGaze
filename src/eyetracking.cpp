@@ -12,9 +12,6 @@
 
 using namespace cv;
 
-static const float kGlintImageMultiplier = 40.0;
-static const float kGlintThreshold = 0.35; // as fraction of max
-
 struct TrackingData {
   HalideGens *gens;
   TrackingData() {
@@ -29,7 +26,7 @@ static void trackGlints(TrackingData *dat, Mat &m) {
   // double maxVal;
   // minMaxIdx(m, nullptr, &maxVal, nullptr, nullptr);
   // threshold(m, m, maxVal*kGlintThreshold, 255, THRESH_BINARY_INV);
-  adaptiveThreshold(m, m, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 11, -10.0);
+  adaptiveThreshold(m, m, 1, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 11, -10.0);
 }
 
 void trackFrame(TrackingData *dat, Mat &m) {
@@ -40,6 +37,7 @@ void trackFrame(TrackingData *dat, Mat &m) {
   // m.convertTo(glintImage, CV_8U, (1.0/256.0)*kGlintImageMultiplier);
   glintImage = glintKernel(dat->gens, m);
   trackGlints(dat, glintImage);
+  Mat foundGlints = findGlints(dat->gens, glintImage);
 
   end = std::chrono::high_resolution_clock::now();
   std::cout << "elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms\n";
@@ -49,7 +47,8 @@ void trackFrame(TrackingData *dat, Mat &m) {
   channels[1] = m;
   channels[0] = channels[2] = min(m, glintImage);
   Mat debugImage;
-  merge(channels,3,debugImage);
+  // merge(channels,3,debugImage);
+  debugImage = foundGlints;
   imshow("main", debugImage);
 }
 
