@@ -7,30 +7,49 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
 
+#include "halideFuncs.h"
+
 using namespace cv;
 
 static const float kGlintImageMultiplier = 40.0;
-static const float kGlintThreshold = 0.4; // as fraction of max
+static const float kGlintThreshold = 0.35; // as fraction of max
 
-static void trackGlints(Mat &m) {
+struct TrackingData {
+  HalideGens *gens;
+  TrackingData() {
+    gens = createGens();
+  }
+  ~TrackingData() {
+    deleteGens(gens);
+  }
+};
+
+static void trackGlints(TrackingData *dat, Mat &m) {
   double maxVal;
+  // imshow("glint", m);
   minMaxIdx(m, nullptr, &maxVal, nullptr, nullptr);
   std::cout << maxVal << std::endl;
-  threshold(m, m, maxVal*kGlintThreshold, 250, THRESH_BINARY);
-  imshow("glint", m);
+  threshold(m, m, maxVal*kGlintThreshold, 255, THRESH_BINARY_INV);
+  // imshow("glint", m);
 }
 
-void trackFrame(Mat &m) {
-  Mat glintImage;
-  m.convertTo(glintImage, CV_8U, (1.0/256.0)*kGlintImageMultiplier);
-  trackGlints(glintImage);
+void trackFrame(TrackingData *dat, Mat &m) {
+  // Mat glintImage;
+  // m.convertTo(glintImage, CV_8U, (1.0/256.0)*kGlintImageMultiplier);
+  Mat glintImage = glintKernel(dat->gens, m);
+  trackGlints(dat, glintImage);
 
+  m.convertTo(m, CV_8U, (1.0/256.0)*100.0, 0);
+  Mat channels[3];
+  channels[2] = m;
+  channels[0] = channels[1] = min(m, glintImage);
   Mat debugImage;
-  m.convertTo(debugImage, CV_16U, 150, 0);
+  merge(channels,3,debugImage);
   imshow("main", debugImage);
 }
 
-void setupTracking() {
+TrackingData *setupTracking() {
   cv::namedWindow("main",CV_WINDOW_NORMAL);
   cv::namedWindow("glint",CV_WINDOW_NORMAL);
+  return new TrackingData();
 }

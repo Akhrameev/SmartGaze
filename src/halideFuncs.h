@@ -4,7 +4,8 @@
 
 #include <opencv2/imgproc/imgproc.hpp>
 
-struct TrackingData;
+struct HalideGens;
+HalideGens *createGens();
+void deleteGens(HalideGens *gens);
 
-TrackingData *setupTracking();
-void trackFrame(TrackingData *dat, cv::Mat &m);
+cv::Mat glintKernel(HalideGens *gens, cv::Mat &m);

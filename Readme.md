@@ -5,7 +5,8 @@ Based on my efforts in [reverse engineering the Eye Tribe tracker](https://githu
 
 ##Building
 
-CMake is required to build SmartGaze
+CMake is required to build SmartGaze. You will also need the [libuvc](https://github.com/ktossell/libuvc) library for camera feed capture and OpenCV and [Halide](http://halide-lang.org/)
+installed for image processing.
 
 ###OSX or Linux with Make
 ```bash
@@ -19,6 +20,16 @@ make
 
 ###On OSX with XCode
 ```bash
+# Install dependencies
+brew install libuvc
+# I use brew install libuvc --HEAD but that shouldn't be necessary
+
+brew tap homebrew/science
+brew install homebrew/science/opencv
+
+brew tap halide/homebrew-halide
+brew install halide/halide/halide
+
 mkdir build
 ./cmakeBuild.sh
 ```

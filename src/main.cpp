@@ -15,14 +15,14 @@
 static const int kCaptureWidth = 1536;
 static const int kCaptureHeight = 1024;
 static const int kCaptureFPS = 60;
-static const char kCurveData[8] = {250, 0, 240, 0, 250, 0, 240, 0};
+static const uint8_t kCurveData[8] = {250, 0, 240, 0, 250, 0, 240, 0};
 
 /* This callback function runs once per frame. Use it to perform any
  * quick processing you need, or have it put the frame into your application's
  * input queue. If this function takes too long, you'll start losing frames. */
-void cb(uvc_frame_t *frame, void *stopPtr) {
+void cb(uvc_frame_t *frame, void *data) {
   cv::Mat cvFrame(frame->height, frame->width, CV_16UC1, frame->data);
-  trackFrame(cvFrame);
+  trackFrame((TrackingData*)(data), cvFrame);
 }
 
 void setLights(uvc_device_handle_t *devh, int lights) {
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     uvc_perror(res, "uvc_init");
     return res;
   }
-  setupTracking();
+  TrackingData *data = setupTracking();
   puts("UVC initialized");
   /* Locates the first attached UVC device, stores in dev */
   res = uvc_find_device(
@@ -79,11 +79,10 @@ int main(int argc, char **argv) {
       } else {
         setLights(devh, 0b1111);
         setupParams(devh);
-        int stop = 0;
         /* Start the video stream. The library will call user function cb:
          *   cb(frame, (void*) 0)
          */
-        res = uvc_start_streaming(devh, &ctrl, cb, (void*)(&stop), 0);
+        res = uvc_start_streaming(devh, &ctrl, cb, (void*)(data), 0);
         if (res < 0) {
           uvc_perror(res, "start_streaming"); /* unable to start stream */
         } else {
