@@ -24,14 +24,24 @@ struct TrackingData {
 
 static void trackGlints(TrackingData *dat, Mat &m) {
   // double maxVal;
-  // minMaxIdx(m, nullptr, &maxVal, nullptr, nullptr);
+  // Point maxPt;
+  // minMaxLoc(m, nullptr, &maxVal, nullptr, &maxPt);
+  // std::cout << "max val: " << maxVal << " at " << maxPt << std::endl;
   // threshold(m, m, maxVal*kGlintThreshold, 255, THRESH_BINARY_INV);
-  adaptiveThreshold(m, m, 1, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 11, -10.0);
+  // adaptiveThreshold(m, m, 1, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 11, -10.0);
+  adaptiveThreshold(m, m, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 11, -10.0);
 }
 
-void trackFrame(TrackingData *dat, Mat &m) {
+void trackFrame(TrackingData *dat, Mat &bigM) {
   std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
   start = std::chrono::high_resolution_clock::now();
+
+  // fix stuck pixel on my EyeTribe by pasting over it
+  // TODO: don't enable this for everyone else
+  bigM.at<uint16_t>(283,627) = bigM.at<uint16_t>(283,626);
+
+  Mat m;
+  resize(bigM, m, Size(bigM.cols/2,bigM.rows/2));
 
   Mat glintImage;
   // m.convertTo(glintImage, CV_8U, (1.0/256.0)*kGlintImageMultiplier);
@@ -47,8 +57,8 @@ void trackFrame(TrackingData *dat, Mat &m) {
   channels[1] = m;
   channels[0] = channels[2] = min(m, glintImage);
   Mat debugImage;
-  // merge(channels,3,debugImage);
-  debugImage = foundGlints;
+  merge(channels,3,debugImage);
+  // debugImage = m;
   imshow("main", debugImage);
 }
 

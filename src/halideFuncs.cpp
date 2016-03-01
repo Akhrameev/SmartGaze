@@ -23,7 +23,7 @@ public:
     Func clamped = BoundaryConditions::repeat_edge(input);
     Func out;
     Expr up = clamped(x,y-kKernelOffset);
-    out(x, y) = Halide::cast<uint8_t>((clamped(x, y)*10)/up);
+    out(x, y) = select(clamped(x, y)>up, Halide::cast<uint8_t>((clamped(x,y)-up)/10), Halide::cast<uint8_t>(0));
 
     // Schedule it.
     out.vectorize(x, 8).parallel(y);

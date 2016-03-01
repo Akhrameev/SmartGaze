@@ -16,6 +16,7 @@ static const int kCaptureWidth = 1536;
 static const int kCaptureHeight = 1024;
 static const int kCaptureFPS = 60;
 static const uint8_t kCurveData[8] = {250, 0, 240, 0, 250, 0, 240, 0};
+static const int kDefaultGain = 20;
 
 /* This callback function runs once per frame. Use it to perform any
  * quick processing you need, or have it put the frame into your application's
@@ -78,7 +79,7 @@ int main(int argc, char **argv) {
         uvc_perror(res, "get_mode"); /* device doesn't provide a matching stream */
       } else {
         setLights(devh, 0b1111);
-        uvc_set_gain(devh, 10);
+        uvc_set_gain(devh, kDefaultGain);
         setupParams(devh);
         /* Start the video stream. The library will call user function cb:
          *   cb(frame, (void*) 0)
@@ -95,10 +96,12 @@ int main(int argc, char **argv) {
               break;
             } else if((char)key == 'o') {
               setLights(devh, 0);
+            } else if((char)key == 'p') {
+              setupParams(devh);
             } else if((char)key == 'g') {
               uvc_set_gain(devh, 0);
             } else if((char)key == 'G') {
-              uvc_set_gain(devh, 10);
+              uvc_set_gain(devh, kDefaultGain);
             }
             // usleep(10000);
           }
