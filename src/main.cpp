@@ -78,6 +78,7 @@ int main(int argc, char **argv) {
         uvc_perror(res, "get_mode"); /* device doesn't provide a matching stream */
       } else {
         setLights(devh, 0b1111);
+        uvc_set_gain(devh, 10);
         setupParams(devh);
         /* Start the video stream. The library will call user function cb:
          *   cb(frame, (void*) 0)
@@ -92,11 +93,11 @@ int main(int argc, char **argv) {
             int key = cv::waitKey(10);
             if((char)key == 'q') {
               break;
-            }
-            if((char)key == 'o') {
+            } else if((char)key == 'o') {
               setLights(devh, 0);
-            }
-            if((char)key == 'g') {
+            } else if((char)key == 'g') {
+              uvc_set_gain(devh, 0);
+            } else if((char)key == 'G') {
               uvc_set_gain(devh, 10);
             }
             // usleep(10000);
