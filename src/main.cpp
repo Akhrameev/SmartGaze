@@ -1,3 +1,7 @@
+// The SmartGaze Eye Tracker
+// Copyright (C) 2016  Tristan Hume
+// Released under GPLv2, see LICENSE file for full text
+
 #include "libuvc/libuvc.h"
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
