@@ -15,7 +15,7 @@ static const int kFirstGlintXShadow = 100;
 static const int kGlintNeighbourhood = 100;
 static const int kEyeRegionWidth = 200;
 static const int kEyeRegionHeight = 160;
-static const double k8BitMultiplier = (265.0/1024.0)*2;
+static const double k8BitScale = (265.0/1024.0)*2.0;
 
 using namespace cv;
 
@@ -54,7 +54,7 @@ static std::vector<Point> trackGlints(TrackingData *dat, Mat &m) {
   // std::cout << "max val: " << maxVal << " at " << maxPt << std::endl;
   // threshold(m, m, maxVal*kGlintThreshold, 255, THRESH_BINARY_INV);
   // adaptiveThreshold(m, m, 1, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 11, -10.0);
-  adaptiveThreshold(m, m, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 11, -30.0);
+  adaptiveThreshold(m, m, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY_INV, 11, -40.0);
 
   // search for first two pixels separated sufficiently horizontally
   // start from the top and only take the first two so that glints off of teeth and headphones are ignored.
@@ -109,12 +109,15 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
     // project onto big image
     Rect roi = Rect(glints[i].x*2-(kEyeRegionWidth/2),glints[i].y*2-(kEyeRegionHeight/2),kEyeRegionWidth,kEyeRegionHeight) & Rect(0,0,bigM.cols,bigM.rows);
     Mat region(bigM, roi);
-    region.convertTo(region, CV_8U, k8BitMultiplier, 0);
+    // Rect roi = Rect(glints[i].x-(kEyeRegionWidth/4),glints[i].y-(kEyeRegionHeight/4),kEyeRegionWidth/2,kEyeRegionHeight/2) & Rect(0,0,m.cols,m.rows);
+    // Mat region(m, roi);
+    region.convertTo(region, CV_8U, k8BitScale, 0);
+    blur(region, region, Size(3,3));
     imshow(std::to_string(i), region);
   }
 
 
-  m.convertTo(m, CV_8U, k8BitMultiplier, 0);
+  m.convertTo(m, CV_8U, k8BitScale, 0);
   Mat channels[3];
   channels[1] = m;
   channels[0] = channels[2] = min(m, glintImage);

@@ -16,7 +16,7 @@ static const int kCaptureWidth = 1536;
 static const int kCaptureHeight = 1024;
 static const int kCaptureFPS = 60;
 static const uint8_t kCurveData[8] = {250, 0, 240, 0, 250, 0, 240, 0};
-static const int kDefaultGain = 20;
+static const int kDefaultGain = 30;
 
 /* This callback function runs once per frame. Use it to perform any
  * quick processing you need, or have it put the frame into your application's
