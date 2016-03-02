@@ -13,6 +13,8 @@
 
 static const int kFirstGlintXShadow = 100;
 static const int kGlintNeighbourhood = 100;
+static const int kEyeRegionWidth = 200;
+static const int kEyeRegionHeight = 100;
 
 using namespace cv;
 
@@ -44,7 +46,7 @@ static Point findLocalCenter(Mat &m, Point p, int size) {
   return Point(xSum/count, ySum/count);
 }
 
-static std::pair<Point,Point> trackGlints(TrackingData *dat, Mat &m) {
+static std::vector<Point> trackGlints(TrackingData *dat, Mat &m) {
   // double maxVal;
   // Point maxPt;
   // minMaxLoc(m, nullptr, &maxVal, nullptr, &maxPt);
@@ -55,29 +57,25 @@ static std::pair<Point,Point> trackGlints(TrackingData *dat, Mat &m) {
 
   // search for first two pixels separated sufficiently horizontally
   // start from the top and only take the first two so that glints off of teeth and headphones are ignored.
-  Point firstPt(0,0), secondPt(0,0);
-  bool foundFirst = false;
-  bool foundSecond = false;
+  std::vector<Point> result;
   for(int i = 0; i < m.rows; i++) {
-    if(foundSecond) break;
+    if(result.size() >= 2) break;
     const uint8_t* Mi = m.ptr<uint8_t>(i);
     for(int j = 0; j < m.cols; j++) {
       if(Mi[j] == 0) {
-        if(!foundFirst) {
-          firstPt = Point(j,i);
-          foundFirst = true;
-        } else if(j > firstPt.x+kFirstGlintXShadow || j < firstPt.x-kFirstGlintXShadow) {
-          secondPt = Point(j,i);
-          foundSecond = true;
+        if(result.empty()) {
+          result.push_back(Point(j,i));
+        } else if(j > result[0].x+kFirstGlintXShadow || j < result[0].x-kFirstGlintXShadow) {
+          result.push_back(Point(j,i));
           break;
         }
       }
     }
   }
   // Make the found point more centered on the eye instead of being just the first one
-  return std::pair<Point,Point>(
-    findLocalCenter(m,firstPt, kGlintNeighbourhood),
-    findLocalCenter(m,secondPt, kGlintNeighbourhood));
+  for(auto &&p : result)
+    p = findLocalCenter(m,p, kGlintNeighbourhood);
+  return result;
 }
 
 void trackFrame(TrackingData *dat, Mat &bigM) {
@@ -101,6 +99,13 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
   std::cout << "elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms\n";
 
   m.convertTo(m, CV_8U, (1.0/256.0)*100.0, 0);
+  for(unsigned i = 0; i < glints.size(); ++i) {
+    Rect roi = Rect(glints[i].x-(kEyeRegionWidth/2),glints[i].y-(kEyeRegionHeight/2),kEyeRegionWidth,kEyeRegionHeight) & Rect(0,0,m.cols,m.rows);
+    Mat region(m, roi);
+    imshow(std::to_string(i), region);
+  }
+
+
   Mat channels[3];
   channels[1] = m;
   channels[0] = channels[2] = min(m, glintImage);
@@ -108,14 +113,16 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
   merge(channels,3,debugImage);
   // debugImage = glintImage;
 
-  circle(debugImage, glints.first, 3, Scalar(255,0,255));
-  circle(debugImage, glints.second, 3, Scalar(255,0,255));
+  for(auto glint : glints)
+    circle(debugImage, glint, 3, Scalar(255,0,255));
 
   imshow("main", debugImage);
 }
 
 TrackingData *setupTracking() {
   cv::namedWindow("main",CV_WINDOW_NORMAL);
+  cv::namedWindow("0",CV_WINDOW_NORMAL);
+  cv::namedWindow("1",CV_WINDOW_NORMAL);
   // cv::namedWindow("glint",CV_WINDOW_NORMAL);
   return new TrackingData();
 }
