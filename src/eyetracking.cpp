@@ -17,6 +17,8 @@ static const int kEyeRegionWidth = 200;
 static const int kEyeRegionHeight = 160;
 static const double k8BitMultiplier = (265.0/1024.0)*2;
 
+int cannyThresh;
+
 using namespace cv;
 
 struct TrackingData {
@@ -110,7 +112,13 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
     Rect roi = Rect(glints[i].x*2-(kEyeRegionWidth/2),glints[i].y*2-(kEyeRegionHeight/2),kEyeRegionWidth,kEyeRegionHeight) & Rect(0,0,bigM.cols,bigM.rows);
     Mat region(bigM, roi);
     region.convertTo(region, CV_8U, k8BitMultiplier, 0);
+    if(i == 0) blur( region, region, Size(3,3) );
+
+    Mat edges;
+    Canny(region, edges, cannyThresh, cannyThresh*2, 3, true);
+
     imshow(std::to_string(i), region);
+    imshow(std::to_string(i)+"_edges", edges);
   }
 
 
@@ -132,6 +140,10 @@ TrackingData *setupTracking() {
   cv::namedWindow("main",CV_WINDOW_NORMAL);
   cv::namedWindow("0",CV_WINDOW_NORMAL);
   cv::namedWindow("1",CV_WINDOW_NORMAL);
+  cv::namedWindow("0_edges",CV_WINDOW_NORMAL);
+  cv::namedWindow("1_edges",CV_WINDOW_NORMAL);
+  cannyThresh = 5;
+  createTrackbar( "Canny Threshold:", "main", &cannyThresh, 100);
   // cv::namedWindow("glint",CV_WINDOW_NORMAL);
   return new TrackingData();
 }
