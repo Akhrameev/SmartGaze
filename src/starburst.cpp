@@ -8,7 +8,7 @@
 
 using namespace cv;
 
-extern vector <Point2f*> edge_point;
+extern vector <Point2f> edge_point;
 extern double pupil_param[5];
 void starburst_pupil_contour_detection(Mat &m, Mat &validMask, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features);
 int* pupil_fitting_inliers(int width, int height, int &return_max_inliers);
@@ -37,23 +37,25 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   threshold(approxCenter, approxCenter, minVal*1.5, 255, THRESH_BINARY);
 
   starburst_pupil_contour_detection(m, approxCenter, minLoc, starThresh, starRays, 1);
-  std::sort(edge_point.begin(), edge_point.end(), [](Point2f *a, Point2f *b) {
-      return b->y < a->y;
+  std::sort(edge_point.begin(), edge_point.end(), [](Point2f a, Point2f b) {
+      return b.y < a.y;
   });
   edge_point.resize((int)(edge_point.size()*(3.0/5.0)));
 
-  int max_inliers_count;
-  pupil_fitting_inliers(m.cols, m.rows, max_inliers_count);
-  RotatedRect fittedIris(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0],pupil_param[1]), -pupil_param[4]*180/PI);
+  // int max_inliers_count;
+  // pupil_fitting_inliers(m.cols, m.rows, max_inliers_count);
+  // RotatedRect fittedIris(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0],pupil_param[1]), -pupil_param[4]*180/PI);
+  RotatedRect fittedIris2 = (edge_point.empty()) ? RotatedRect() : fitEllipse(edge_point);
 
   Mat debugImage;
   cvtColor(m, debugImage, CV_GRAY2RGB);
-  for(Point2f *p : edge_point) {
-    Point intPt(p->x, p->y);
+  for(Point2f p : edge_point) {
+    Point intPt(p.x, p.y);
     circle(debugImage, intPt, 1, Scalar(0,255,0));
   }
   circle(debugImage, minLoc, 2, Scalar(0,0,255));
-  ellipse(debugImage, fittedIris, Scalar(255, 0, 200));
+  // ellipse(debugImage, fittedIris, Scalar(255, 0, 200));
+  ellipse(debugImage, fittedIris2, Scalar(255, 255, 0));
   imshow(debugName, debugImage);
 
   return RotatedRect();
@@ -84,7 +86,6 @@ void get_5_random_num(int max_num, int* rand_num);
 bool solve_ellipse(double* conic_param, double* pupil_param);
 Point2f* normalize_edge_point(double &dis_scale, Point2f &nor_center, int ep_num);
 void denormalize_ellipse_param(double* par, double* normalized_par, double dis_scale, Point2f nor_center);
-void destroy_edge_point();
 
 
 void locate_edge_points(Mat &m, Mat &validMask, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh);
@@ -95,7 +96,7 @@ Point2f* normalize_point_set(Point2f* point_set, double &dis_scale, Point2f &nor
 int inliers_num;
 int angle_step = 20;    //20 degrees
 double pupil_param[5] = {0, 0, 0, 0, 0};
-vector <Point2f*> edge_point;
+vector <Point2f> edge_point;
 vector <int> edge_intensity_diff;
 
 
@@ -113,7 +114,7 @@ void starburst_pupil_contour_detection(Mat &m, Mat &validMask, Point2f start_poi
   int loop_count = 0;
   double angle_step = 2*PI/N;
   double new_angle_step;
-  Point2f *edge, edge_mean;
+  Point2f edge, edge_mean;
   double angle_normal;
   double cx = start_point.x;
   double cy = start_point.y;
@@ -121,10 +122,10 @@ void starburst_pupil_contour_detection(Mat &m, Mat &validMask, Point2f start_poi
 
   while (edge_thresh > 5 && loop_count <= 10) {
     edge_intensity_diff.clear();
-    destroy_edge_point();
+    edge_point.clear();
     while (edge_point.size() < minimum_candidate_features && edge_thresh > 5) {
       edge_intensity_diff.clear();
-      destroy_edge_point();
+      edge_point.clear();
       locate_edge_points(m, validMask, cx, cy, dis, angle_step, 0, 2*PI, edge_thresh);
       if (edge_point.size() < minimum_candidate_features) {
         edge_thresh -= 1;
@@ -137,9 +138,9 @@ void starburst_pupil_contour_detection(Mat &m, Mat &validMask, Point2f start_poi
     first_ep_num = edge_point.size();
     for (int i = 0; i < first_ep_num; i++) {
       edge = edge_point.at(i);
-      angle_normal = atan2(cy-edge->y, cx-edge->x);
+      angle_normal = atan2(cy-edge.y, cx-edge.x);
       new_angle_step = angle_step*(edge_thresh*1.0/edge_intensity_diff.at(i));
-      locate_edge_points(m, validMask, edge->x, edge->y, dis, new_angle_step, angle_normal,
+      locate_edge_points(m, validMask, edge.x, edge.y, dis, new_angle_step, angle_normal,
 angle_spread, edge_thresh);
     }
 
@@ -153,13 +154,13 @@ angle_spread, edge_thresh);
   }
 
   if (loop_count > 10) {
-    destroy_edge_point();
+    edge_point.clear();
     printf("Error! edge points did not converge in %d iterations!\n", loop_count);
     return;
   }
 
   if (edge_thresh <= 5) {
-    destroy_edge_point();
+    edge_point.clear();
     printf("Error! Adaptive threshold is too low!\n");
     return;
   }
@@ -167,7 +168,7 @@ angle_spread, edge_thresh);
 
 void locate_edge_points(Mat &m, Mat &validMask, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh) {
   double angle;
-  Point2f p, *edge;
+  Point2f p, edge;
   double dis_cos, dis_sin;
   uint8_t pixel_value1, pixel_value2;
 
@@ -187,9 +188,8 @@ void locate_edge_points(Mat &m, Mat &validMask, double cx, double cy, int dis, d
       pixel_value2 = m.at<uint8_t>((int)(p.y), (int)(p.x));
       bool is_valid = validMask.at<uint8_t>((int)(p.y - dis_sin/2), (int)(p.x - dis_cos/2)) > 0;
       if (pixel_value2 - pixel_value1 > edge_thresh && is_valid) {
-        edge = (Point2f*)malloc(sizeof(Point2f));
-        edge->x = p.x - dis_cos/2;
-        edge->y = p.y - dis_sin/2;
+        edge.x = p.x - dis_cos/2;
+        edge.y = p.y - dis_sin/2;
         edge_point.push_back(edge);
         edge_intensity_diff.push_back(pixel_value2 - pixel_value1);
         break;
@@ -200,14 +200,14 @@ void locate_edge_points(Mat &m, Mat &validMask, double cx, double cy, int dis, d
 }
 
 Point2f get_edge_mean() {
-  Point2f *edge;
+  Point2f edge;
   int i;
   double sumx=0, sumy=0;
   Point2f edge_mean;
   for (i = 0; i < edge_point.size(); i++) {
     edge = edge_point.at(i);
-    sumx += edge->x;
-    sumy += edge->y;
+    sumx += edge.x;
+    sumy += edge.y;
   }
   if (edge_point.size() != 0) {
     edge_mean.x = sumx / edge_point.size();
@@ -217,17 +217,6 @@ Point2f get_edge_mean() {
     edge_mean.y = -1;
   }
   return edge_mean;
-}
-
-void destroy_edge_point() {
-  vector <Point2f*>::iterator iter;
-
-  if (edge_point.size() != 0) {
-    for (iter = edge_point.begin(); iter != edge_point.end( ) ; iter++ ) {
-      free(*iter);
-    }
-    edge_point.clear();
-  }
 }
 
 //------------ Ransac ellipse fitting -----------//
@@ -304,41 +293,16 @@ bool solve_ellipse(double* conic_param, double* ellipse_param) {
   return 1;
 }
 
-Point2f* normalize_point_set(Point2f* point_set, double &dis_scale, Point2f &nor_center, int num) {
-  double sumx = 0, sumy = 0;
-  double sumdis = 0;
-  Point2f *edge = point_set;
-  int i;
-  for (i = 0; i < num; i++) {
-    sumx += edge->x;
-    sumy += edge->y;
-    sumdis += sqrt((double)(edge->x*edge->x + edge->y*edge->y));
-    edge++;
-  }
-
-  dis_scale = sqrt((double)2)*num/sumdis;
-  nor_center.x = sumx*1.0/num;
-  nor_center.y = sumy*1.0/num;
-  Point2f *edge_point_nor = (Point2f*)malloc(sizeof(Point2f)*num);
-  edge = point_set;
-  for (i = 0; i < num; i++) {
-    edge_point_nor[i].x = (edge->x - nor_center.x)*dis_scale;
-    edge_point_nor[i].y = (edge->y - nor_center.y)*dis_scale;
-    edge++;
-  }
-  return edge_point_nor;
-}
-
 Point2f* normalize_edge_point(double &dis_scale, Point2f &nor_center, int ep_num) {
   double sumx = 0, sumy = 0;
   double sumdis = 0;
-  Point2f *edge;
+  Point2f edge;
   int i;
   for (i = 0; i < ep_num; i++) {
     edge = edge_point.at(i);
-    sumx += edge->x;
-    sumy += edge->y;
-    sumdis += sqrt((double)(edge->x*edge->x + edge->y*edge->y));
+    sumx += edge.x;
+    sumy += edge.y;
+    sumdis += sqrt((double)(edge.x*edge.x + edge.y*edge.y));
   }
 
   dis_scale = sqrt((double)2)*ep_num/sumdis;
@@ -347,8 +311,8 @@ Point2f* normalize_edge_point(double &dis_scale, Point2f &nor_center, int ep_num
   Point2f *edge_point_nor = (Point2f*)malloc(sizeof(Point2f)*ep_num);
   for (i = 0; i < ep_num; i++) {
     edge = edge_point.at(i);
-    edge_point_nor[i].x = (edge->x - nor_center.x)*dis_scale;
-    edge_point_nor[i].y = (edge->y - nor_center.y)*dis_scale;
+    edge_point_nor[i].x = (edge.x - nor_center.x)*dis_scale;
+    edge_point_nor[i].y = (edge.y - nor_center.y)*dis_scale;
   }
   return edge_point_nor;
 }
