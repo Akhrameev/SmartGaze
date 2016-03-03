@@ -13,6 +13,7 @@ void starburst_pupil_contour_detection(Mat &m, Point2f start_point, int edge_thr
 
 int starThresh = 80;
 int starRays = 25;
+int starAbsThresh = 70;
 RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   starburst_pupil_contour_detection(m, Point2f(m.cols/2.0,m.rows/2.0), starThresh, starRays, 10);
 
@@ -64,7 +65,7 @@ Point2f* normalize_point_set(Point2f* point_set, double &dis_scale, Point2f &nor
 
 int inliers_num;
 int angle_step = 20;    //20 degrees
-int pupil_edge_thres = 20;
+int pupil_edge_thresh = 20;
 double pupil_param[5] = {0, 0, 0, 0, 0};
 vector <Point2f*> edge_point;
 vector <int> edge_intensity_diff;
@@ -156,7 +157,7 @@ void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step
         break;
 
       pixel_value2 = m.at<uint8_t>((int)(p.y), (int)(p.x));
-      if (pixel_value2 - pixel_value1 > pupil_edge_thres) {
+      if (pixel_value2 - pixel_value1 > pupil_edge_thresh && pixel_value2 <= starAbsThresh) {
         edge = (Point2f*)malloc(sizeof(Point2f));
         edge->x = p.x - dis_cos/2;
         edge->y = p.y - dis_sin/2;

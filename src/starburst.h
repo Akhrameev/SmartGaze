@@ -9,6 +9,7 @@
 
 extern int starThresh;
 extern int starRays;
+extern int starAbsThresh;
 cv::RotatedRect findEllipseStarburst(cv::Mat &m, const std::string &debugName);
 
 #endif
