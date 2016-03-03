@@ -30,38 +30,32 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
 #endif
 
 #include <vector>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 
 using namespace std;
 
-//ransac program parameters
-extern stuDPoint start_point;
-extern int inliers_num;
-extern int angle_step;
-//extern stuDPoint *edge_point;
-extern int pupil_edge_thres;
-extern double pupil_param[5];
-extern vector <stuDPoint*> edge_point;
-
 void get_5_random_num(int max_num, int* rand_num);
 bool solve_ellipse(double* conic_param, double* ellipse_param);
-int* pupil_fitting_inliers(UINT8* pupil_image, int, int, int &return_max_inliers);
-stuDPoint* normalize_edge_point(double &dis_scale, stuDPoint &nor_center, int ep_num);
-void denormalize_ellipse_param(double* par, double* normailized_par, double dis_scale, stuDPoint nor_center);
+int* pupil_fitting_inliers(uint8_t* pupil_image, int, int, int &return_max_inliers);
+Point2f* normalize_edge_point(double &dis_scale, Point2f &nor_center, int ep_num);
+void denormalize_ellipse_param(double* par, double* normalized_par, double dis_scale, Point2f nor_center);
 void destroy_edge_point();
 
 
-void starburst_pupil_contour_detection(UINT8* pupil_image, int width, int height, int edge_thresh, int N, int minimum_cadidate_features);
-void locate_edge_points(UINT8* image, int width, int height, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh);
-stuDPoint get_edge_mean();
+void starburst_pupil_contour_detection(uint8_t* pupil_image, int width, int height, int edge_thresh, int N, int minimum_candidate_features);
+void locate_edge_points(uint8_t* image, int width, int height, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh);
+Point2f get_edge_mean();
 
-stuDPoint* normalize_point_set(stuDPoint* point_set, double &dis_scale, stuDPoint &nor_center, int num);
+Point2f* normalize_point_set(Point2f* point_set, double &dis_scale, Point2f &nor_center, int num);
 
-stuDPoint start_point = {-1, -1};
+Point2f start_point = {-1, -1};
 int inliers_num;
 int angle_step = 20;    //20 degrees
 int pupil_edge_thres = 20;
 double pupil_param[5] = {0, 0, 0, 0, 0};
-vector <stuDPoint*> edge_point;
+vector <Point2f*> edge_point;
 vector <int> edge_intensity_diff;
 
 
@@ -74,14 +68,13 @@ vector <int> edge_intensity_diff;
 // pupil_edge_threshold: best guess for the pupil contour threshold
 // N: number of rays
 // minimum_candidate_features: must return this many features or error
-void starburst_pupil_contour_detection(UINT8* pupil_image, int width, int height, int edge_thresh, int N, int minimum_cadidate_features)
-{
+void starburst_pupil_contour_detection(uint8_t* pupil_image, int width, int height, int edge_thresh, int N, int minimum_candidate_features) {
   int dis = 7;
   double angle_spread = 100*PI/180;
   int loop_count = 0;
   double angle_step = 2*PI/N;
   double new_angle_step;
-  stuDPoint *edge, edge_mean;
+  Point2f *edge, edge_mean;
   double angle_normal;
   double cx = start_point.x;
   double cy = start_point.y;
@@ -90,11 +83,11 @@ void starburst_pupil_contour_detection(UINT8* pupil_image, int width, int height
   while (edge_thresh > 5 && loop_count <= 10) {
     edge_intensity_diff.clear();
     destroy_edge_point();
-    while (edge_point.size() < minimum_cadidate_features && edge_thresh > 5) {
+    while (edge_point.size() < minimum_candidate_features && edge_thresh > 5) {
       edge_intensity_diff.clear();
       destroy_edge_point();
       locate_edge_points(pupil_image, width, height, cx, cy, dis, angle_step, 0, 2*PI, edge_thresh);
-      if (edge_point.size() < minimum_cadidate_features) {
+      if (edge_point.size() < minimum_candidate_features) {
         edge_thresh -= 1;
       }
     }
@@ -133,10 +126,9 @@ angle_spread, edge_thresh);
   }
 }
 
-void locate_edge_points(UINT8* image, int width, int height, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh)
-{
+void locate_edge_points(uint8_t* image, int width, int height, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh) {
   double angle;
-  stuDPoint p, *edge;
+  Point2f p, *edge;
   double dis_cos, dis_sin;
   int pixel_value1, pixel_value2;
 
@@ -155,7 +147,7 @@ void locate_edge_points(UINT8* image, int width, int height, double cx, double c
 
       pixel_value2 = image[(int)(p.y)*width+(int)(p.x)];
       if (pixel_value2 - pixel_value1 > pupil_edge_thres) {
-        edge = (stuDPoint*)malloc(sizeof(stuDPoint));
+        edge = (Point2f*)malloc(sizeof(Point2f));
         edge->x = p.x - dis_cos/2;
         edge->y = p.y - dis_sin/2;
         edge_point.push_back(edge);
@@ -167,12 +159,11 @@ void locate_edge_points(UINT8* image, int width, int height, double cx, double c
   }
 }
 
-stuDPoint get_edge_mean()
-{
-  stuDPoint *edge;
+Point2f get_edge_mean() {
+  Point2f *edge;
   int i;
   double sumx=0, sumy=0;
-  stuDPoint edge_mean;
+  Point2f edge_mean;
   for (i = 0; i < edge_point.size(); i++) {
     edge = edge_point.at(i);
     sumx += edge->x;
@@ -188,9 +179,8 @@ stuDPoint get_edge_mean()
   return edge_mean;
 }
 
-void destroy_edge_point()
-{
-  vector <stuDPoint*>::iterator iter;
+void destroy_edge_point() {
+  vector <Point2f*>::iterator iter;
 
   if (edge_point.size() != 0) {
     for (iter = edge_point.begin(); iter != edge_point.end( ) ; iter++ ) {
@@ -202,8 +192,7 @@ void destroy_edge_point()
 
 //------------ Ransac ellipse fitting -----------//
 // Randomly select 5 indeics
-void get_5_random_num(int max_num, int* rand_num)
-{
+void get_5_random_num(int max_num, int* rand_num) {
   int rand_index = 0;
   int r;
   int i;
@@ -237,8 +226,7 @@ void get_5_random_num(int max_num, int* rand_num)
 // conic_param[6] is the parameters of a conic {a, b, c, d, e, f}; conic equation: ax^2 + bxy + cy^2 + dx + ey + f = 0;
 // ellipse_param[5] is the parameters of an ellipse {ellipse_a, ellipse_b, cx, cy, theta}; a & b is the major or minor axis;
 // cx & cy is the ellipse center; theta is the ellipse orientation
-bool solve_ellipse(double* conic_param, double* ellipse_param)
-{
+bool solve_ellipse(double* conic_param, double* ellipse_param) {
   double a = conic_param[0];
   double b = conic_param[1];
   double c = conic_param[2];
@@ -276,11 +264,10 @@ bool solve_ellipse(double* conic_param, double* ellipse_param)
   return 1;
 }
 
-stuDPoint* normalize_point_set(stuDPoint* point_set, double &dis_scale, stuDPoint &nor_center, int num)
-{
+Point2f* normalize_point_set(Point2f* point_set, double &dis_scale, Point2f &nor_center, int num) {
   double sumx = 0, sumy = 0;
   double sumdis = 0;
-  stuDPoint *edge = point_set;
+  Point2f *edge = point_set;
   int i;
   for (i = 0; i < num; i++) {
     sumx += edge->x;
@@ -292,7 +279,7 @@ stuDPoint* normalize_point_set(stuDPoint* point_set, double &dis_scale, stuDPoin
   dis_scale = sqrt((double)2)*num/sumdis;
   nor_center.x = sumx*1.0/num;
   nor_center.y = sumy*1.0/num;
-  stuDPoint *edge_point_nor = (stuDPoint*)malloc(sizeof(stuDPoint)*num);
+  Point2f *edge_point_nor = (Point2f*)malloc(sizeof(Point2f)*num);
   edge = point_set;
   for (i = 0; i < num; i++) {
     edge_point_nor[i].x = (edge->x - nor_center.x)*dis_scale;
@@ -302,11 +289,10 @@ stuDPoint* normalize_point_set(stuDPoint* point_set, double &dis_scale, stuDPoin
   return edge_point_nor;
 }
 
-stuDPoint* normalize_edge_point(double &dis_scale, stuDPoint &nor_center, int ep_num)
-{
+Point2f* normalize_edge_point(double &dis_scale, Point2f &nor_center, int ep_num) {
   double sumx = 0, sumy = 0;
   double sumdis = 0;
-  stuDPoint *edge;
+  Point2f *edge;
   int i;
   for (i = 0; i < ep_num; i++) {
     edge = edge_point.at(i);
@@ -318,7 +304,7 @@ stuDPoint* normalize_edge_point(double &dis_scale, stuDPoint &nor_center, int ep
   dis_scale = sqrt((double)2)*ep_num/sumdis;
   nor_center.x = sumx*1.0/ep_num;
   nor_center.y = sumy*1.0/ep_num;
-  stuDPoint *edge_point_nor = (stuDPoint*)malloc(sizeof(stuDPoint)*ep_num);
+  Point2f *edge_point_nor = (Point2f*)malloc(sizeof(Point2f)*ep_num);
   for (i = 0; i < ep_num; i++) {
     edge = edge_point.at(i);
     edge_point_nor[i].x = (edge->x - nor_center.x)*dis_scale;
@@ -327,19 +313,17 @@ stuDPoint* normalize_edge_point(double &dis_scale, stuDPoint &nor_center, int ep
   return edge_point_nor;
 }
 
-void denormalize_ellipse_param(double* par, double* normailized_par, double dis_scale, stuDPoint nor_center)
-{
-    par[0] = normailized_par[0] / dis_scale;  //major or minor axis
-    par[1] = normailized_par[1] / dis_scale;
-    par[2] = normailized_par[2] / dis_scale + nor_center.x; //ellipse center
-    par[3] = normailized_par[3] / dis_scale + nor_center.y;
+void denormalize_ellipse_param(double* par, double* normalized_par, double dis_scale, Point2f nor_center) {
+    par[0] = normalized_par[0] / dis_scale;  //major or minor axis
+    par[1] = normalized_par[1] / dis_scale;
+    par[2] = normalized_par[2] / dis_scale + nor_center.x; //ellipse center
+    par[3] = normalized_par[3] / dis_scale + nor_center.y;
 }
 
-int* pupil_fitting_inliers(UINT8* pupil_image, int width, int height,  int &return_max_inliers_num)
-{
+int* pupil_fitting_inliers(uint8_t* pupil_image, int width, int height,  int &return_max_inliers_num) {
   int i;
   int ep_num = edge_point.size();   //ep stands for edge point
-  stuDPoint nor_center;
+  Point2f nor_center;
   double dis_scale;
 
   int ellipse_point_num = 5;  //number of point that needed to fit an ellipse
@@ -351,7 +335,7 @@ int* pupil_fitting_inliers(UINT8* pupil_image, int width, int height,  int &retu
   }
 
   //Normalization
-  stuDPoint *edge_point_nor = normalize_edge_point(dis_scale, nor_center, ep_num);
+  Point2f *edge_point_nor = normalize_edge_point(dis_scale, nor_center, ep_num);
 
   //Ransac
   int *inliers_index = (int*)malloc(sizeof(int)*ep_num);
@@ -400,7 +384,11 @@ int* pupil_fitting_inliers(UINT8* pupil_image, int width, int height,  int &retu
       A[i][4] = edge_point_nor[rand_index[i]].y;
     }
 
-    svd(M, N, ppa, ppu, pd, ppv);
+    // TODO: make this work
+    // svd(M, N, ppa, ppu, pd, ppv);
+    // all ppa, etc are in normal row major order
+    // replace with something like: SVD::compute(A, pd, ppu, ppv)
+
     min_d_index = 0;
     for (i = 1; i < N; i++) {
       if (pd[i] < pd[min_d_index])
