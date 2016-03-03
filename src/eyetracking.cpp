@@ -5,6 +5,7 @@
 #include "eyetracking.h"
 
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/photo/photo.hpp>
 #include <iostream>
 #include <chrono>
 #include <utility>
@@ -102,20 +103,28 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
   auto glints = trackGlints(dat, glintImage);
   Mat foundGlints = findGlints(dat->gens, glintImage);
 
-  end = std::chrono::high_resolution_clock::now();
-  std::cout << "elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms\n";
 
   for(unsigned i = 0; i < glints.size(); ++i) {
     // project onto big image
+    Rect smallRoi = Rect(glints[i].x-(kEyeRegionWidth/4),glints[i].y-(kEyeRegionHeight/4),kEyeRegionWidth/2,kEyeRegionHeight/2) & Rect(0,0,m.cols,m.rows);
     Rect roi = Rect(glints[i].x*2-(kEyeRegionWidth/2),glints[i].y*2-(kEyeRegionHeight/2),kEyeRegionWidth,kEyeRegionHeight) & Rect(0,0,bigM.cols,bigM.rows);
     Mat region(bigM, roi);
-    // Rect roi = Rect(glints[i].x-(kEyeRegionWidth/4),glints[i].y-(kEyeRegionHeight/4),kEyeRegionWidth/2,kEyeRegionHeight/2) & Rect(0,0,m.cols,m.rows);
-    // Mat region(m, roi);
+    // Mat region(m, smallRoi);
     region.convertTo(region, CV_8U, k8BitScale, 0);
     blur(region, region, Size(3,3));
+
+    // inpaint over the glints so they don't mess up further stages
+    Mat glintMask = Mat(glintImage, smallRoi).clone();
+    threshold(glintMask, glintMask, 0, 255, THRESH_BINARY_INV); // invert mask
+    dilate(glintMask, glintMask, getStructuringElement(MORPH_RECT, Size(4,4))); // without this it inpaints white
+    resize(glintMask, glintMask, roi.size());
+    inpaint(region, glintMask, region, 4, INPAINT_NS);
+
     imshow(std::to_string(i), region);
   }
 
+  end = std::chrono::high_resolution_clock::now();
+  std::cout << "elapsed time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << "ms\n";
 
   m.convertTo(m, CV_8U, k8BitScale, 0);
   Mat channels[3];
