@@ -6,6 +6,8 @@
 
 #include <opencv2/highgui/highgui.hpp>
 
+static const float kLowPassWeight = (1.0/2.0);
+
 using namespace cv;
 
 extern vector <Point2f*> edge_point;
@@ -140,7 +142,7 @@ void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step
   double angle;
   Point2f p, *edge;
   double dis_cos, dis_sin;
-  uint8_t pixel_value1, pixel_value2;
+  float pixel_value1, pixel_value2;
 
   for (angle = angle_normal-angle_spread/2+0.0001; angle < angle_normal+angle_spread/2; angle += angle_step) {
     dis_cos = dis * cos(angle);
@@ -164,7 +166,7 @@ void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step
         edge_intensity_diff.push_back(pixel_value2 - pixel_value1);
         break;
       }
-      pixel_value1 = pixel_value2;
+      pixel_value1 = pixel_value2*kLowPassWeight + pixel_value1*(1.0-kLowPassWeight);
     }
   }
 }
