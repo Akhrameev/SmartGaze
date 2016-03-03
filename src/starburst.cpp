@@ -8,8 +8,21 @@
 
 using namespace cv;
 
+extern vector <Point2f*> edge_point;
+void starburst_pupil_contour_detection(Mat &m, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features);
+
+int starThresh = 80;
+int starRays = 25;
 RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
-  imshow(debugName, m);
+  starburst_pupil_contour_detection(m, Point2f(m.cols/2.0,m.rows/2.0), starThresh, starRays, 10);
+
+  Mat debugImage;
+  cvtColor(m, debugImage, CV_GRAY2RGB);
+  for(Point2f *p : edge_point) {
+    circle(debugImage, Point(p->x, p->y), 1, Scalar(0,255,0));
+  }
+  imshow(debugName, debugImage);
+
   return RotatedRect();
 }
 
@@ -44,13 +57,11 @@ void denormalize_ellipse_param(double* par, double* normalized_par, double dis_s
 void destroy_edge_point();
 
 
-void starburst_pupil_contour_detection(uint8_t* pupil_image, int width, int height, int edge_thresh, int N, int minimum_candidate_features);
-void locate_edge_points(uint8_t* image, int width, int height, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh);
+void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh);
 Point2f get_edge_mean();
 
 Point2f* normalize_point_set(Point2f* point_set, double &dis_scale, Point2f &nor_center, int num);
 
-Point2f start_point = {-1, -1};
 int inliers_num;
 int angle_step = 20;    //20 degrees
 int pupil_edge_thres = 20;
@@ -62,13 +73,12 @@ vector <int> edge_intensity_diff;
 //------------ Starburst pupil edge detection -----------//
 
 // Input
-// pupile_image: input image
-// width, height: size of the input image
-// cx,cy: central start point of the feature detection process
-// pupil_edge_threshold: best guess for the pupil contour threshold
+// m: input image
+// start_point: central start point of the feature detection process
+// edge_thresh: best guess for the pupil contour threshold
 // N: number of rays
 // minimum_candidate_features: must return this many features or error
-void starburst_pupil_contour_detection(uint8_t* pupil_image, int width, int height, int edge_thresh, int N, int minimum_candidate_features) {
+void starburst_pupil_contour_detection(Mat &m, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features) {
   int dis = 7;
   double angle_spread = 100*PI/180;
   int loop_count = 0;
@@ -86,7 +96,7 @@ void starburst_pupil_contour_detection(uint8_t* pupil_image, int width, int heig
     while (edge_point.size() < minimum_candidate_features && edge_thresh > 5) {
       edge_intensity_diff.clear();
       destroy_edge_point();
-      locate_edge_points(pupil_image, width, height, cx, cy, dis, angle_step, 0, 2*PI, edge_thresh);
+      locate_edge_points(m, cx, cy, dis, angle_step, 0, 2*PI, edge_thresh);
       if (edge_point.size() < minimum_candidate_features) {
         edge_thresh -= 1;
       }
@@ -100,7 +110,7 @@ void starburst_pupil_contour_detection(uint8_t* pupil_image, int width, int heig
       edge = edge_point.at(i);
       angle_normal = atan2(cy-edge->y, cx-edge->x);
       new_angle_step = angle_step*(edge_thresh*1.0/edge_intensity_diff.at(i));
-      locate_edge_points(pupil_image, width, height, edge->x, edge->y, dis, new_angle_step, angle_normal,
+      locate_edge_points(m, edge->x, edge->y, dis, new_angle_step, angle_normal,
 angle_spread, edge_thresh);
     }
 
@@ -126,11 +136,11 @@ angle_spread, edge_thresh);
   }
 }
 
-void locate_edge_points(uint8_t* image, int width, int height, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh) {
+void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh) {
   double angle;
   Point2f p, *edge;
   double dis_cos, dis_sin;
-  int pixel_value1, pixel_value2;
+  uint8_t pixel_value1, pixel_value2;
 
   for (angle = angle_normal-angle_spread/2+0.0001; angle < angle_normal+angle_spread/2; angle += angle_step) {
     dis_cos = dis * cos(angle);
@@ -138,14 +148,14 @@ void locate_edge_points(uint8_t* image, int width, int height, double cx, double
     p.x = cx + dis_cos;
     p.y = cy + dis_sin;
 
-    pixel_value1 = image[(int)(p.y)*width+(int)(p.x)];
+    pixel_value1 = m.at<uint8_t>((int)(p.y), (int)(p.x));
     while (1) {
       p.x += dis_cos;
       p.y += dis_sin;
-      if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height)
+      if (p.x < 0 || p.x >= m.cols || p.y < 0 || p.y >= m.rows)
         break;
 
-      pixel_value2 = image[(int)(p.y)*width+(int)(p.x)];
+      pixel_value2 = m.at<uint8_t>((int)(p.y), (int)(p.x));
       if (pixel_value2 - pixel_value1 > pupil_edge_thres) {
         edge = (Point2f*)malloc(sizeof(Point2f));
         edge->x = p.x - dis_cos/2;

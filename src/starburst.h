@@ -7,6 +7,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <string>
 
+extern int starThresh;
+extern int starRays;
 cv::RotatedRect findEllipseStarburst(cv::Mat &m, const std::string &debugName);
 
 #endif
