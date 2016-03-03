@@ -5,7 +5,7 @@ find_library(LIBHALIDE_LIBRARY Halide)
 
 include_directories(${LIBUVC_INCLUDE_DIR} ${LIBHALIDE_INCLUDE_DIR})
 link_directories(/usr/local/lib)
-add_executable( SmartGaze main.cpp eyetracking.cpp halideFuncs.cpp starburst.cpp)
+add_executable( SmartGaze main.cpp eyetracking.cpp halideFuncs.cpp starburst.cpp svd.cpp)
 set_property(TARGET SmartGaze PROPERTY CXX_STANDARD 11)
 set_property(TARGET SmartGaze PROPERTY CXX_STANDARD_REQUIRED ON)
 target_link_libraries( SmartGaze ${OpenCV_LIBS} ${LIBUVC_LIBRARY} ${LIBHALIDE_LIBRARY})

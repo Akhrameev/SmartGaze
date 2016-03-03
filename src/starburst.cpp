@@ -12,6 +12,9 @@ extern vector <Point2f*> edge_point;
 extern double pupil_param[5];
 void starburst_pupil_contour_detection(Mat &m, Mat &validMask, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features);
 int* pupil_fitting_inliers(int width, int height, int &return_max_inliers);
+#ifndef PI
+#define PI 3.141592653589
+#endif
 
 int starThresh = 16;
 int starRays = 15;
@@ -41,7 +44,7 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
 
   int max_inliers_count;
   pupil_fitting_inliers(m.cols, m.rows, max_inliers_count);
-  RotatedRect fittedIris(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0],pupil_param[1]), pupil_param[4]);
+  RotatedRect fittedIris(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0],pupil_param[1]), -pupil_param[4]*180/PI);
 
   Mat debugImage;
   cvtColor(m, debugImage, CV_GRAY2RGB);
@@ -68,14 +71,12 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
 // Copyright (c) 2004-2006
 // All Rights Reserved.
 
-#ifndef PI
-#define PI 3.141592653589
-#endif
 
 #include <vector>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include "svd.h"
 
 using namespace std;
 
@@ -389,14 +390,23 @@ int* pupil_fitting_inliers(int width, int height,  int &return_max_inliers_num) 
   memset(inliers_index, int(0), sizeof(int)*ep_num);
   memset(max_inliers_index, int(0), sizeof(int)*ep_num);
   int rand_index[5];
-
-  Mat A(6,6,CV_64FC1);
-  for (i = 0; i < A.cols; i++) {
-    A.at<double>(i,5) = 1;
-    A.at<double>(5,i) = 0;
+  double A[6][6];
+  int M = 6, N = 6; //M is row; N is column
+  for (i = 0; i < N; i++) {
+    A[i][5] = 1;
+    A[5][i] = 0;
   }
-  Mat pd, ppu, ppv;
-
+  double **ppa = (double**)malloc(sizeof(double*)*M);
+  double **ppu = (double**)malloc(sizeof(double*)*M);
+  double **ppv = (double**)malloc(sizeof(double*)*N);
+  for (i = 0; i < M; i++) {
+    ppa[i] = A[i];
+    ppu[i] = (double*)malloc(sizeof(double)*N);
+  }
+  for (i = 0; i < N; i++) {
+    ppv[i] = (double*)malloc(sizeof(double)*N);
+  }
+  double pd[6];
   int min_d_index;
   double conic_par[6] = {0};
   double ellipse_par[5] = {0};
@@ -407,27 +417,22 @@ int* pupil_fitting_inliers(int width, int height,  int &return_max_inliers_num) 
 
     //svd decomposition to solve the ellipse parameter
     for (i = 0; i < 5; i++) {
-      A.at<double>(i,0) = edge_point_nor[rand_index[i]].x * edge_point_nor[rand_index[i]].x;
-      A.at<double>(i,1) = edge_point_nor[rand_index[i]].x * edge_point_nor[rand_index[i]].y;
-      A.at<double>(i,2) = edge_point_nor[rand_index[i]].y * edge_point_nor[rand_index[i]].y;
-      A.at<double>(i,3) = edge_point_nor[rand_index[i]].x;
-      A.at<double>(i,4) = edge_point_nor[rand_index[i]].y;
+      A[i][0] = edge_point_nor[rand_index[i]].x * edge_point_nor[rand_index[i]].x;
+      A[i][1] = edge_point_nor[rand_index[i]].x * edge_point_nor[rand_index[i]].y;
+      A[i][2] = edge_point_nor[rand_index[i]].y * edge_point_nor[rand_index[i]].y;
+      A[i][3] = edge_point_nor[rand_index[i]].x;
+      A[i][4] = edge_point_nor[rand_index[i]].y;
     }
 
-    // TODO: make this work
-    // svd(M, N, ppa, ppu, pd, ppv);
-    // all ppa, etc are in normal row major order
-    // replace with something like: SVD::compute(A, pd, ppu, ppv)
-    SVD::compute(A, pd, ppu, ppv);
-
+    svd(M, N, ppa, ppu, pd, ppv);
     min_d_index = 0;
-    for (i = 1; i < A.rows; i++) {
-      if (pd.at<double>(i) < pd.at<double>(min_d_index))
+    for (i = 1; i < N; i++) {
+      if (pd[i] < pd[min_d_index])
         min_d_index = i;
     }
 
-    for (i = 0; i < A.rows; i++)
-      conic_par[i] = ppv.at<double>(i,min_d_index); //the column of v that corresponds to the smallest singular value,
+    for (i = 0; i < N; i++)
+      conic_par[i] = ppv[i][min_d_index]; //the column of v that corresponds to the smallest singular value,
                                                 //which is the solution of the equations
     ninliers = 0;
     memset(inliers_index, 0, sizeof(int)*ep_num);
@@ -474,6 +479,14 @@ int* pupil_fitting_inliers(int width, int height,  int &return_max_inliers_num) 
     free(max_inliers_index);
     max_inliers_index = NULL;
   }
+
+  for (i = 0; i < M; i++) {
+    free(ppu[i]);
+    free(ppv[i]);
+  }
+  free(ppu);
+  free(ppv);
+  free(ppa);
 
   free(edge_point_nor);
   free(inliers_index);
