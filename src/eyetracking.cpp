@@ -11,6 +11,7 @@
 #include <utility>
 
 #include "halideFuncs.h"
+#include "starburst.h"
 
 static const int kFirstGlintXShadow = 100;
 static const int kGlintNeighbourhood = 100;
@@ -120,7 +121,7 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
     resize(glintMask, glintMask, roi.size());
     inpaint(region, glintMask, region, 4, INPAINT_NS);
 
-    imshow(std::to_string(i), region);
+    findEllipseStarburst(region, std::to_string(i));
   }
 
   end = std::chrono::high_resolution_clock::now();
