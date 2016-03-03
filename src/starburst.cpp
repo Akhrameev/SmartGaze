@@ -9,18 +9,37 @@
 using namespace cv;
 
 extern vector <Point2f*> edge_point;
-void starburst_pupil_contour_detection(Mat &m, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features);
+void starburst_pupil_contour_detection(Mat &m, Mat &validMask, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features);
 
-int starThresh = 80;
-int starRays = 25;
+int starThresh = 16;
+int starRays = 15;
 RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
-  starburst_pupil_contour_detection(m, Point2f(m.cols/2.0,m.rows/2.0), starThresh, starRays, 10);
+  // Gradient
+  // Mat grad_x, grad_y, grad;
+  // Mat abs_grad_x, abs_grad_y;
+  // Scharr( m, grad_x, CV_16S, 1, 0);
+  // convertScaleAbs( grad_x, abs_grad_x );
+  // Scharr( m, grad_y, CV_16S, 0, 1);
+  // convertScaleAbs( grad_y, abs_grad_y );
+  // addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad );
+
+  // Blackest area
+  Mat approxCenter;
+  blur(m, approxCenter, Size(15,15));
+  Point minLoc;
+  double minVal;
+  minMaxLoc(approxCenter, &minVal, nullptr, &minLoc, nullptr);
+  threshold(approxCenter, approxCenter, minVal*1.5, 255, THRESH_BINARY);
+
+  starburst_pupil_contour_detection(m, approxCenter, minLoc, starThresh, starRays, 1);
 
   Mat debugImage;
   cvtColor(m, debugImage, CV_GRAY2RGB);
   for(Point2f *p : edge_point) {
-    circle(debugImage, Point(p->x, p->y), 1, Scalar(0,255,0));
+    Point intPt(p->x, p->y);
+    circle(debugImage, intPt, 1, Scalar(0,255,0));
   }
+  circle(debugImage, minLoc, 2, Scalar(0,0,255));
   imshow(debugName, debugImage);
 
   return RotatedRect();
@@ -57,14 +76,13 @@ void denormalize_ellipse_param(double* par, double* normalized_par, double dis_s
 void destroy_edge_point();
 
 
-void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh);
+void locate_edge_points(Mat &m, Mat &validMask, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh);
 Point2f get_edge_mean();
 
 Point2f* normalize_point_set(Point2f* point_set, double &dis_scale, Point2f &nor_center, int num);
 
 int inliers_num;
 int angle_step = 20;    //20 degrees
-int pupil_edge_thres = 20;
 double pupil_param[5] = {0, 0, 0, 0, 0};
 vector <Point2f*> edge_point;
 vector <int> edge_intensity_diff;
@@ -78,7 +96,7 @@ vector <int> edge_intensity_diff;
 // edge_thresh: best guess for the pupil contour threshold
 // N: number of rays
 // minimum_candidate_features: must return this many features or error
-void starburst_pupil_contour_detection(Mat &m, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features) {
+void starburst_pupil_contour_detection(Mat &m, Mat &validMask, Point2f start_point, int edge_thresh, int N, int minimum_candidate_features) {
   int dis = 7;
   double angle_spread = 100*PI/180;
   int loop_count = 0;
@@ -96,7 +114,7 @@ void starburst_pupil_contour_detection(Mat &m, Point2f start_point, int edge_thr
     while (edge_point.size() < minimum_candidate_features && edge_thresh > 5) {
       edge_intensity_diff.clear();
       destroy_edge_point();
-      locate_edge_points(m, cx, cy, dis, angle_step, 0, 2*PI, edge_thresh);
+      locate_edge_points(m, validMask, cx, cy, dis, angle_step, 0, 2*PI, edge_thresh);
       if (edge_point.size() < minimum_candidate_features) {
         edge_thresh -= 1;
       }
@@ -110,7 +128,7 @@ void starburst_pupil_contour_detection(Mat &m, Point2f start_point, int edge_thr
       edge = edge_point.at(i);
       angle_normal = atan2(cy-edge->y, cx-edge->x);
       new_angle_step = angle_step*(edge_thresh*1.0/edge_intensity_diff.at(i));
-      locate_edge_points(m, edge->x, edge->y, dis, new_angle_step, angle_normal,
+      locate_edge_points(m, validMask, edge->x, edge->y, dis, new_angle_step, angle_normal,
 angle_spread, edge_thresh);
     }
 
@@ -136,7 +154,7 @@ angle_spread, edge_thresh);
   }
 }
 
-void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh) {
+void locate_edge_points(Mat &m, Mat &validMask, double cx, double cy, int dis, double angle_step, double angle_normal, double angle_spread, int edge_thresh) {
   double angle;
   Point2f p, *edge;
   double dis_cos, dis_sin;
@@ -156,7 +174,8 @@ void locate_edge_points(Mat &m, double cx, double cy, int dis, double angle_step
         break;
 
       pixel_value2 = m.at<uint8_t>((int)(p.y), (int)(p.x));
-      if (pixel_value2 - pixel_value1 > pupil_edge_thres) {
+      bool is_valid = validMask.at<uint8_t>((int)(p.y - dis_sin/2), (int)(p.x - dis_cos/2)) > 0;
+      if (pixel_value2 - pixel_value1 > edge_thresh && is_valid) {
         edge = (Point2f*)malloc(sizeof(Point2f));
         edge->x = p.x - dis_cos/2;
         edge->y = p.y - dis_sin/2;
