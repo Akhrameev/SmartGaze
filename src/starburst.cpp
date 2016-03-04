@@ -17,7 +17,7 @@ int* pupil_fitting_inliers(int width, int height, int &return_max_inliers);
 #endif
 
 int starThresh = 16;
-int starRays = 15;
+int starRays = 35;
 RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   // Gradient
   // Mat grad_x, grad_y, grad;
@@ -42,10 +42,10 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   });
   edge_point.resize((int)(edge_point.size()*(3.0/5.0)));
 
-  // int max_inliers_count;
-  // pupil_fitting_inliers(m.cols, m.rows, max_inliers_count);
-  // RotatedRect fittedIris(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0],pupil_param[1]), -pupil_param[4]*180/PI);
-  RotatedRect fittedIris2 = (edge_point.empty()) ? RotatedRect() : fitEllipse(edge_point);
+  int max_inliers_count;
+  pupil_fitting_inliers(m.cols, m.rows, max_inliers_count);
+  RotatedRect fittedIris2(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0]*2,pupil_param[1]*2), -pupil_param[4]*180/PI);
+  RotatedRect fittedIris = (edge_point.size() < 5) ? RotatedRect() : fitEllipse(edge_point);
 
   Mat debugImage;
   cvtColor(m, debugImage, CV_GRAY2RGB);
@@ -54,8 +54,8 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
     circle(debugImage, intPt, 1, Scalar(0,255,0));
   }
   circle(debugImage, minLoc, 2, Scalar(0,0,255));
-  // ellipse(debugImage, fittedIris, Scalar(255, 0, 200));
-  ellipse(debugImage, fittedIris2, Scalar(255, 255, 0));
+  ellipse(debugImage, fittedIris2, Scalar(255, 0, 200));
+  ellipse(debugImage, fittedIris, Scalar(255, 255, 0));
   imshow(debugName, debugImage);
 
   return RotatedRect();
