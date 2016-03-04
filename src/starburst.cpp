@@ -5,8 +5,12 @@
 #include "starburst.h"
 
 #include <opencv2/highgui/highgui.hpp>
+#include <cmath>
+
+static const int kNumFilterSegments = 30;
 
 using namespace cv;
+using namespace std;
 
 extern vector <Point2f> edge_point;
 extern double pupil_param[5];
@@ -17,7 +21,7 @@ int* pupil_fitting_inliers(int width, int height, int &return_max_inliers);
 #endif
 
 int starThresh = 16;
-int starRays = 35;
+int starRays = 45;
 RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   // Gradient
   // Mat grad_x, grad_y, grad;
@@ -42,20 +46,58 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   });
   edge_point.resize((int)(edge_point.size()*(3.0/5.0)));
 
+  Mat polarDebug = Mat::zeros(400,300, CV_8UC3);
+  vector<pair<Point2f,Point2f>> polarPoints;
+  for(Point2f p : edge_point) {
+    Point2f offset = p - Point2f(minLoc.x, minLoc.y);
+    Point2f polar;
+    polar.x = atan2(offset.y, offset.x)*(180.0/PI);
+    polar.y = sqrt(offset.x*offset.x + offset.y*offset.y);
+    // circle(polarDebug, Point(polar.x,polar.y), 1, Scalar(0,255,0));
+    polarPoints.push_back(pair<Point2f,Point2f>(polar, p));
+  }
+  std::sort(polarPoints.begin(), polarPoints.end(), [](pair<Point2f,Point2f> a, pair<Point2f,Point2f> b) {
+      return a.first.x < b.first.x;
+  });
+  vector<Point2f> goodPoints;
+  float segmentSize = polarPoints.size() / (float)(kNumFilterSegments);
+  for(unsigned i = 0; i < kNumFilterSegments; i++) {
+    auto start = polarPoints.begin()+std::min((size_t)std::round(i*segmentSize),polarPoints.size());
+    auto stop = polarPoints.begin()+std::min((size_t)std::round((i+1)*segmentSize),polarPoints.size());
+    if(stop-start == 0) break;
+    std::sort(start, stop, [](pair<Point2f,Point2f> a, pair<Point2f,Point2f> b) {
+        return a.first.y < b.first.y;
+    });
+    auto median = start+(stop-start)/2;
+    goodPoints.push_back((*median).second);
+    for(; start != stop; start++) {
+      circle(polarDebug, Point(start->first.x,start->first.y), 1, Scalar(100,0,100 + (i*50 % 155)));
+    }
+    circle(polarDebug, Point(median->first.x,median->first.y), 2, Scalar(0,255,0));
+  }
+  imshow(debugName+"_polar", polarDebug);
+
+
   int max_inliers_count;
   pupil_fitting_inliers(m.cols, m.rows, max_inliers_count);
   RotatedRect fittedIris2(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0]*2,pupil_param[1]*2), -pupil_param[4]*180/PI);
   RotatedRect fittedIris = (edge_point.size() < 5) ? RotatedRect() : fitEllipse(edge_point);
+  RotatedRect fittedIris3 = (goodPoints.size() < 5) ? RotatedRect() : fitEllipse(goodPoints);
 
   Mat debugImage;
   cvtColor(m, debugImage, CV_GRAY2RGB);
-  for(Point2f p : edge_point) {
+  // for(Point2f p : edge_point) {
+  //   Point intPt(p.x, p.y);
+  //   circle(debugImage, intPt, 1, Scalar(0,255,0));
+  // }
+  for(Point2f p : goodPoints) {
     Point intPt(p.x, p.y);
-    circle(debugImage, intPt, 1, Scalar(0,255,0));
+    circle(debugImage, intPt, 2, Scalar(0,0,255));
   }
   circle(debugImage, minLoc, 2, Scalar(0,0,255));
-  ellipse(debugImage, fittedIris2, Scalar(255, 0, 200));
+  // ellipse(debugImage, fittedIris2, Scalar(255, 0, 200));
   ellipse(debugImage, fittedIris, Scalar(255, 255, 0));
+  ellipse(debugImage, fittedIris3, Scalar(0, 255, 255));
   imshow(debugName, debugImage);
 
   return RotatedRect();
@@ -80,7 +122,6 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
 #include <cstdlib>
 #include "svd.h"
 
-using namespace std;
 
 void get_5_random_num(int max_num, int* rand_num);
 bool solve_ellipse(double* conic_param, double* pupil_param);
@@ -178,6 +219,8 @@ void locate_edge_points(Mat &m, Mat &validMask, double cx, double cy, int dis, d
     p.x = cx + dis_cos;
     p.y = cy + dis_sin;
 
+    if (p.x < 0 || p.x >= m.cols || p.y < 0 || p.y >= m.rows)
+      continue;
     pixel_value1 = m.at<uint8_t>((int)(p.y), (int)(p.x));
     while (1) {
       p.x += dis_cos;
