@@ -101,7 +101,13 @@ int main(int argc, char **argv) {
             } else if((char)key == 'g') {
               uvc_set_gain(devh, 0);
             } else if((char)key == 'G') {
-              uvc_set_gain(devh, kDefaultGain);
+              uvc_set_gain(devh, 51);
+            } else if((char)key == 'e') {
+              uint32_t exposure;
+              uvc_get_exposure_abs(devh, &exposure, UVC_GET_CUR);
+              printf("Exposure: %i\n", exposure);
+            } else if((char)key == 'E') {
+              uvc_set_exposure_abs(devh, 160);
             }
             // usleep(10000);
           }
