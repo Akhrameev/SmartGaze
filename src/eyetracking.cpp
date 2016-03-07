@@ -145,6 +145,13 @@ TrackingData *setupTracking() {
   cv::namedWindow("main",CV_WINDOW_NORMAL);
   cv::namedWindow("0",CV_WINDOW_NORMAL);
   cv::namedWindow("1",CV_WINDOW_NORMAL);
+  cv::namedWindow("0_polar",CV_WINDOW_NORMAL);
+  cv::namedWindow("1_polar",CV_WINDOW_NORMAL);
+  cv::moveWindow("main", 600, 600);
+  cv::moveWindow("0", 400, 50);
+  cv::moveWindow("1", 600, 50);
+  cv::moveWindow("0_polar", 400, 300);
+  cv::moveWindow("1_polar", 600, 300);
   // cv::namedWindow("glint",CV_WINDOW_NORMAL);
   createTrackbar("Starburst thresh", "main", &starThresh, 180);
   createTrackbar("Starburst rays", "main", &starRays, 80);

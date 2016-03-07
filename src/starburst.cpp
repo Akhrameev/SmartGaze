@@ -46,7 +46,7 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   });
   edge_point.resize((int)(edge_point.size()*(3.0/5.0)));
 
-  Mat polarDebug = Mat::zeros(400,300, CV_8UC3);
+  Mat polarDebug = Mat::zeros(200,200, CV_8UC3);
   vector<pair<Point2f,Point2f>> polarPoints;
   for(Point2f p : edge_point) {
     Point2f offset = p - Point2f(minLoc.x, minLoc.y);
@@ -98,6 +98,7 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   // ellipse(debugImage, fittedIris2, Scalar(255, 0, 200));
   ellipse(debugImage, fittedIris, Scalar(255, 255, 0));
   ellipse(debugImage, fittedIris3, Scalar(0, 255, 255));
+  circle(debugImage, fittedIris3.center, 2, Scalar(0,255, 0));
   imshow(debugName, debugImage);
 
   return RotatedRect();
