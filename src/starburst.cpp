@@ -3,6 +3,7 @@
 // Released under GPLv2, see LICENSE file for full text
 
 #include "starburst.h"
+#include "ellipse.h"
 
 #include <opencv2/highgui/highgui.hpp>
 #include <cmath>
@@ -83,6 +84,8 @@ RotatedRect findEllipseStarburst(Mat &m, const std::string &debugName) {
   RotatedRect fittedIris2(Point2f(pupil_param[2],pupil_param[3]), Size2f(pupil_param[0]*2,pupil_param[1]*2), -pupil_param[4]*180/PI);
   RotatedRect fittedIris = (edge_point.size() < 5) ? RotatedRect() : fitEllipse(edge_point);
   RotatedRect fittedIris3 = (goodPoints.size() < 5) ? RotatedRect() : fitEllipse(goodPoints);
+
+  ellipseScore(m, fittedIris3);
 
   Mat debugImage;
   cvtColor(m, debugImage, CV_GRAY2RGB);

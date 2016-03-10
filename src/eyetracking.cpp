@@ -112,6 +112,7 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
     Mat region(bigM, roi);
     // Mat region(m, smallRoi);
     region.convertTo(region, CV_8U, k8BitScale, 0);
+    // imshow(std::to_string(i)+"_raw", region);
     blur(region, region, Size(3,3));
 
     // inpaint over the glints so they don't mess up further stages
