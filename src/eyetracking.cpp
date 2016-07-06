@@ -17,6 +17,8 @@ static const int kFirstGlintXShadow = 100;
 static const int kGlintNeighbourhood = 100;
 static const int kEyeRegionWidth = 200;
 static const int kEyeRegionHeight = 160;
+static const int kGlintIntensityRegionDist = 80;
+static const double kGlintRegionIntensityThresh = 240.0;
 static const double k8BitScale = (265.0/1024.0)*2.0;
 
 using namespace cv;
@@ -49,7 +51,21 @@ static Point findLocalCenter(Mat &m, Point p, int size) {
   return Point(xSum/count, ySum/count);
 }
 
-static std::vector<Point> trackGlints(TrackingData *dat, Mat &m) {
+// find the average intensity above and beside a point
+static double findLocalIntensity(Mat &m, Point p, int size) {
+  int sum = 0;
+  int numPixels = 0;
+  for(int i = std::max(0,p.y-size); i < p.y; i++) {
+    const uint16_t* Mi = m.ptr<uint16_t>(i);
+    for(int j = std::max(0,p.x-size); j < std::min(m.cols,p.x+size); j++) {
+      sum += Mi[j];
+      numPixels += 1;
+    }
+  }
+  return ((double)(sum))/numPixels;
+}
+
+static std::vector<Point> trackGlints(TrackingData *dat, Mat &m, Mat &rawInput) {
   // double maxVal;
   // Point maxPt;
   // minMaxLoc(m, nullptr, &maxVal, nullptr, &maxPt);
@@ -66,12 +82,15 @@ static std::vector<Point> trackGlints(TrackingData *dat, Mat &m) {
     const uint8_t* Mi = m.ptr<uint8_t>(i);
     for(int j = 0; j < m.cols; j++) {
       if(Mi[j] == 0) {
-        if(result.empty()) {
-          result.push_back(Point(j,i));
-        } else if(j > result[0].x+kFirstGlintXShadow || j < result[0].x-kFirstGlintXShadow) {
-          result.push_back(Point(j,i));
-          break;
+        if(!result.empty() && !(j > result[0].x+kFirstGlintXShadow || j < result[0].x-kFirstGlintXShadow)) {
+          continue; // skip points too close to first point
         }
+        Point pt(j,i);
+        double avgIntensity = findLocalIntensity(rawInput, pt, kGlintIntensityRegionDist);
+        // std::cout << "average intensity: " << avgIntensity << std::endl;
+        if(avgIntensity < kGlintRegionIntensityThresh) continue; // probably glint off dark hair
+        result.push_back(pt);
+        if(result.size() >= 2) break;
       }
     }
   }
@@ -101,8 +120,8 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
   Mat glintImage;
   m.convertTo(glintImage, CV_8U, 256.0/1024.0);
   // glintImage = glintKernel(dat->gens, m);
-  auto glints = trackGlints(dat, glintImage);
-  Mat foundGlints = findGlints(dat->gens, glintImage);
+  auto glints = trackGlints(dat, glintImage, m);
+  // Mat foundGlints = findGlints(dat->gens, glintImage);
 
 
   for(unsigned i = 0; i < glints.size(); ++i) {
@@ -139,6 +158,8 @@ void trackFrame(TrackingData *dat, Mat &bigM) {
   for(auto glint : glints)
     circle(debugImage, glint, 3, Scalar(255,0,255));
 
+  // bigM.convertTo(bigM, CV_8U, k8BitScale, 0);
+  // imshow("main", bigM);
   imshow("main", debugImage);
 }
 
